@@ -107,10 +107,5 @@ namespace EWSBenchmark
             UpdateAuthBoxes();
         }
 
-        private void textBoxUsername_TextChanged(object sender, EventArgs e)
-        {
-            if (textBoxUsername.Text.Contains("@"))
-                textBoxMailbox.Text = textBoxUsername.Text;
-        }
     }
 }
