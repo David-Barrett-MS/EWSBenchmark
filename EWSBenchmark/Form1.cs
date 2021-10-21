@@ -79,9 +79,7 @@ namespace EWSBenchmark
             if (String.IsNullOrEmpty(mailbox))
                 mailbox = textBoxUsername.Text;
             if (radioButtonOffice365.Checked)
-            {
                 _benchmark = new ClassBenchmark(mailbox, cred, _stats, _logger, "https://outlook.office365.com/EWS/Exchange.asmx");
-            }
             else if (radioButtonCustomUrl.Checked)
             {
                 _benchmark = new ClassBenchmark(mailbox, cred, _stats, _logger, textBoxCustomEWSUrl.Text);
@@ -91,6 +89,7 @@ namespace EWSBenchmark
                 _benchmark = new ClassBenchmark(mailbox, cred, _stats, _logger);
 
             _benchmark.MaxThreads = (int)numericUpDownThreads.Value;
+            _benchmark.SetTraceFile("trace.log");
 
             if (checkBoxImpersonate.Checked)
             {

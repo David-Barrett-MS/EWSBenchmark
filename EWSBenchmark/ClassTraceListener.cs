@@ -15,59 +15,48 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Xml;
+using System.IO;
 using Microsoft.Exchange.WebServices.Data;
 
-namespace EWSBenchMark
+namespace EWSBenchmark
 {
-    class ClassTraceListener : ITraceListener
+    public class ClassTraceListener : ITraceListener
     {
-        private Dictionary<string, int> oTraceType = new Dictionary<string, int>();
+        string _traceFile = "";
+        private StreamWriter _traceStream = null;
 
-        public void Trace(string traceType, string traceMessage)
+        public ClassTraceListener(string traceFile)
         {
-            CreateTextFile(traceType, traceMessage.ToString());
-        }
-
-        private void CreateTextFile(string fileName, string traceContent)
-        {
-            int iIndex = 1;
-            // Save the trace information to file
             try
             {
-                if (!oTraceType.ContainsKey(fileName))
-                {
-                    // Clear the file at the start of the sequence
-                    try
-                    {
-                        System.IO.File.Delete(fileName + ".txt");
-                    }
-                    catch
-                    {
-                    }
-                    oTraceType.Add(fileName, 1);
-                }
-                oTraceType.TryGetValue(fileName, out iIndex);
-                if (iIndex == 1)
-                {
-                    // This is the first log, so wipe the file (if it exists)
-                    try
-                    {
-                        System.IO.File.Delete(fileName + ".txt");
-                    }
-                    catch
-                    {
-                    }
-                }
-                System.IO.File.AppendAllText(fileName + ".txt", "\r\n\r\nSequence: " + iIndex + "\r\n\r\n");
-                iIndex++;
-                oTraceType.Remove(fileName);
-                oTraceType.Add(fileName, iIndex);
-                System.IO.File.AppendAllText(fileName + ".txt", traceContent);
+                _traceStream = File.AppendText(traceFile);
+                _traceFile = traceFile;
             }
-            catch
+            catch { }
+        }
+
+        ~ClassTraceListener()
+        {
+            try
             {
-                // Failed to save...
+                _traceStream?.Flush();
+                _traceStream?.Close();
+            }
+            catch { }
+        }
+        public void Trace(string traceType, string traceMessage)
+        {
+            if (_traceStream == null)
+                return;
+
+            lock (_traceStream)
+            {
+                try
+                {
+                    _traceStream.WriteLine(traceMessage);
+                    _traceStream.Flush();
+                }
+                catch { }
             }
         }
     }

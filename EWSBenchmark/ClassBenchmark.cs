@@ -1,4 +1,17 @@
-﻿using System;
+﻿/*
+ * By David Barrett, Microsoft Ltd. 2013-2021. Use at your own risk.  No warranties are given.
+ * 
+ * DISCLAIMER:
+ * THIS CODE IS SAMPLE CODE. THESE SAMPLES ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND.
+ * MICROSOFT FURTHER DISCLAIMS ALL IMPLIED WARRANTIES INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF MERCHANTABILITY OR OF FITNESS FOR
+ * A PARTICULAR PURPOSE. THE ENTIRE RISK ARISING OUT OF THE USE OR PERFORMANCE OF THE SAMPLES REMAINS WITH YOU. IN NO EVENT SHALL
+ * MICROSOFT OR ITS SUPPLIERS BE LIABLE FOR ANY DAMAGES WHATSOEVER (INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS,
+ * BUSINESS INTERRUPTION, LOSS OF BUSINESS INFORMATION, OR OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR INABILITY TO USE THE
+ * SAMPLES, EVEN IF MICROSOFT HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. BECAUSE SOME STATES DO NOT ALLOW THE EXCLUSION OR LIMITATION
+ * OF LIABILITY FOR CONSEQUENTIAL OR INCIDENTAL DAMAGES, THE ABOVE LIMITATION MAY NOT APPLY TO YOU.
+ * */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,11 +30,12 @@ namespace EWSBenchmark
         public string folderId;
     }
 
-    class ClassBenchmark
+    public class ClassBenchmark
     {
         private ClassLogger _logger = null;
         private ClassStats _stats = null;
         private ExchangeService _service = null;
+        private ClassTraceListener _traceListener = null;
         private string _mailbox = "";
         private int _maxItems = 50;
         private int _testRuns = 1;
@@ -30,6 +44,7 @@ namespace EWSBenchmark
         private bool _stopRequested = false;
         private int _foldersBeingProcessed = 0;
         private FolderId _allItemsFolderId = null;
+        private DateTime _backOffEndTime = DateTime.MinValue;
         private Queue<string> _conversationIdsToSearch = null;
         public static bool IgnoreSSLErrors { get; set; } = false;
 
@@ -160,17 +175,36 @@ namespace EWSBenchmark
             _logger.Log("--------------------------------------------------------------------------");
         }
 
+        public void SetTraceFile(string TraceFile)
+        {
+            _traceListener = new ClassTraceListener(TraceFile);
+            _service.TraceListener = _traceListener;
+            _service.TraceFlags = TraceFlags.All;
+            _service.TraceEnabled = true;
+        }
+
         private bool Throttled(Exception ex)
         {
             // Check if we were throttled, and if so, back off for the specified time
-            if (ex.Message =="The server cannot service this request right now. Try again later.")
+            if (ex is ServerBusyException)
             {
-                // Will add the proper check when I can trigger some throttling...
-                _stats.AddStat("Times Throttled", 1);
+                // Need to read BackoffMilliseconds and work out when we can next send data
+                _backOffEndTime = DateTime.Now.AddMilliseconds(((ServerBusyException)ex).BackOffMilliseconds);
+                _stats.AddStat("Throttled", 1);
                 return true;
             }
             Logger?.Log($"Unexpected error: {ex.Message}");
             return false;
+        }
+
+        private void SleepIfThrottled()
+        {
+            if (_backOffEndTime <= DateTime.Now)
+                return;
+
+            int millisecondsUntilResume = (int)_backOffEndTime.Subtract(DateTime.Now).TotalMilliseconds;
+            if (millisecondsUntilResume>0)
+                Thread.Sleep(millisecondsUntilResume);
         }
 
         private void RecurseFolders(Folder rootFolder)
@@ -203,6 +237,13 @@ namespace EWSBenchmark
                     _service.ImpersonatedUserId = new ImpersonatedUserId(exchangeService.ImpersonatedUserId.IdType, exchangeService.ImpersonatedUserId.Id);
                     _service.HttpHeaders.Add("X-AnchorMailbox", exchangeService.ImpersonatedUserId.Id); // Required for Exchange 2013+            }
                 }
+            }
+
+            if (exchangeService.TraceListener != null)
+            {
+                copiedExchangeService.TraceListener = exchangeService.TraceListener;
+                copiedExchangeService.TraceFlags = exchangeService.TraceFlags;
+                copiedExchangeService.TraceEnabled = exchangeService.TraceEnabled;
             }
             return copiedExchangeService;
         }
@@ -303,6 +344,9 @@ namespace EWSBenchmark
         {
             if (exchangeService == null)
                 exchangeService = CopyExchangeServiceObject(_service);
+
+            SleepIfThrottled();
+
             Folder folder = null;
             long startTicks = DateTime.Now.Ticks;
             try
@@ -325,6 +369,9 @@ namespace EWSBenchmark
         {
             if (exchangeService == null)
                 exchangeService = CopyExchangeServiceObject(_service);
+
+            SleepIfThrottled();
+
             Item item = null;
             long startTicks = DateTime.Now.Ticks;
             try
@@ -348,6 +395,9 @@ namespace EWSBenchmark
         {
             if (folder == null)
                 return null;
+
+            SleepIfThrottled();
+
             FindFoldersResults results = null;
             long startTicks = DateTime.Now.Ticks;
             try
@@ -370,6 +420,9 @@ namespace EWSBenchmark
         {
             if (exchangeService == null)
                 exchangeService = _service;
+
+            SleepIfThrottled();
+
             FindItemsResults<Item> results = null;
             long startTicks = DateTime.Now.Ticks;
             try
@@ -390,6 +443,8 @@ namespace EWSBenchmark
 
         private FolderId AllItemsFolderId(ExchangeService exchangeService)
         {
+            SleepIfThrottled();
+
             if (_allItemsFolderId == null)
             {
                 // Need to find the Id for All Items folder. Should be MsgFolderRoot/AllItems
@@ -416,6 +471,8 @@ namespace EWSBenchmark
             view.Traversal = ItemTraversal.Shallow;
 
             SearchFilter searchFilter = new SearchFilter.IsEqualTo(EmailMessageSchema.ConversationId, conversationId);
+
+            SleepIfThrottled();
 
             FindItemsResults<Item> results = null;
             long startTicks = DateTime.Now.Ticks;

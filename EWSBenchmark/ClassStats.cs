@@ -56,7 +56,7 @@ namespace EWSBenchmark
         }
     }
 
-    class ClassStats
+    public class ClassStats
     {
         private Dictionary<string, List<long>> _responseTimes;
 

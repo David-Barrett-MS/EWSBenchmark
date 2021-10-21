@@ -100,11 +100,13 @@
             // radioButtonOffice365
             // 
             this.radioButtonOffice365.AutoSize = true;
+            this.radioButtonOffice365.Checked = true;
             this.radioButtonOffice365.Location = new System.Drawing.Point(6, 20);
             this.radioButtonOffice365.Margin = new System.Windows.Forms.Padding(2);
             this.radioButtonOffice365.Name = "radioButtonOffice365";
             this.radioButtonOffice365.Size = new System.Drawing.Size(74, 17);
             this.radioButtonOffice365.TabIndex = 14;
+            this.radioButtonOffice365.TabStop = true;
             this.radioButtonOffice365.Text = "Office 365";
             this.radioButtonOffice365.UseVisualStyleBackColor = true;
             // 
@@ -369,12 +371,10 @@
             // radioButtonCustomUrl
             // 
             this.radioButtonCustomUrl.AutoSize = true;
-            this.radioButtonCustomUrl.Checked = true;
             this.radioButtonCustomUrl.Location = new System.Drawing.Point(173, 20);
             this.radioButtonCustomUrl.Name = "radioButtonCustomUrl";
             this.radioButtonCustomUrl.Size = new System.Drawing.Size(63, 17);
             this.radioButtonCustomUrl.TabIndex = 16;
-            this.radioButtonCustomUrl.TabStop = true;
             this.radioButtonCustomUrl.Text = "Custom:";
             this.radioButtonCustomUrl.UseVisualStyleBackColor = true;
             // 
