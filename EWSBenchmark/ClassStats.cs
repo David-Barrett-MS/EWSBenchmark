@@ -9,12 +9,25 @@ namespace EWSBenchmark
     public class StatsUpdatedEventArgs : EventArgs
     {
         private string _statDescription;
-        private List<long> _statList;
+        private long _average = 0;
+        private long _minimum = 0;
+        private long _maximum = 0;
+        private long _total = 0;
 
         public StatsUpdatedEventArgs(string StatDescription, List<long> Stats)
         {
             _statDescription = StatDescription;
-            _statList = Stats;
+            lock (Stats)
+            {
+                try
+                {
+                    _average = (long)Stats.Average();
+                    _minimum = (long)Stats.Min();
+                    _maximum = (long)Stats.Max();
+                    _total = Stats.Count();
+                }
+                catch { }
+            }
         }
 
         public string StatDescription
@@ -24,22 +37,22 @@ namespace EWSBenchmark
 
         public long Average
         {
-            get { return (long)_statList.Average(); }
+            get { return _average; }
         }
 
         public long Minimum
         {
-            get { return _statList.Min(); }
+            get { return _minimum; }
         }
 
         public long Maximum
         {
-            get { return _statList.Max(); }
+            get { return _maximum; }
         }
 
         public long Total
         {
-            get { return _statList.Count; }
+            get { return _total; }
         }
     }
 
@@ -49,6 +62,7 @@ namespace EWSBenchmark
 
         public delegate void StatsUpdatedEventHandler(object sender, StatsUpdatedEventArgs a);
         public event StatsUpdatedEventHandler StatUpdated;
+        private object _statsLock = new object();
 
         public ClassStats()
         {
@@ -58,9 +72,12 @@ namespace EWSBenchmark
         public void AddStat(string request, long responseTimeInTicks)
         {
             TimeSpan responseTime = new TimeSpan(responseTimeInTicks);
-            if (!_responseTimes.ContainsKey(request))
-                _responseTimes.Add(request, new List<long>());
-            _responseTimes[request].Add((long)responseTime.TotalMilliseconds);
+            lock (_responseTimes)
+            {
+                if (!_responseTimes.ContainsKey(request))
+                    _responseTimes.Add(request, new List<long>());
+                _responseTimes[request].Add((long)responseTime.TotalMilliseconds);
+            }
             OnStatUpdated(new StatsUpdatedEventArgs(request, _responseTimes[request]));
         }
 
